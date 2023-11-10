@@ -1,0 +1,114 @@
+enum Operation {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+}
+
+enum PublicationStatus {
+  DRAFT
+  PUBLISHED
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  email                String     @id @unique @db.VarChar(50)
+  password             String?
+  userViewAccess       Boolean
+  teamViewAccess       Boolean
+  blogViewAccess       Boolean
+  projectViewAccess    Boolean
+  socialsViewAccess    Boolean
+  featureViewAccess    Boolean
+  auditTrailViewAccess Boolean
+  assetViewAccess      Boolean
+  jwtToken             JwtToken?  @relation(fields: [jwtTokenId], references: [id]) // one-to-one, does not exist in db
+  jwtTokenId           String?    @unique // can either **both** be optional or **both** mandatory
+  activities           Activity[] // must not be annotated with @relation
+}
+
+model JwtToken {
+  id             String @id @unique @default(uuid())
+  token          String @db.VarChar(512)
+  aliveInSeconds Int
+  user           User? // one-to-one, no relation scalar must be optional
+}
+
+model Activity {
+  id                String    @id @unique @default(uuid())
+  dateTime          DateTime
+  user              User      @relation(fields: [issuer], references: [email]) // can either **both** be optional or **both** mandatory
+  issuer            String    @unique @db.VarChar(50)
+  operation         Operation
+  affectedRessource Json // TODO: we need to that with "beforeDelete" and fks
+}
+
+model Member {
+  id                    Int        @id @unique @default(autoincrement())
+  firstName             String     @db.VarChar(30)
+  lastName              String     @db.VarChar(30)
+  jobTitle              String     @db.VarChar(80)
+  responsibility        String     @db.VarChar(50)
+  profilePictureAsset   Asset?     @relation(fields: [profilePictureAssetId], references: [fileName])
+  profilePictureAssetId String?    @unique
+  org                   String     @db.VarChar(15)
+  department            Department @relation(fields: [departmentId], references: [name])
+  departmentId          String     @unique @db.VarChar(20)
+  blogs                 Blog[] // fk to blogs
+  projects              String // fk to projects
+  order                 Int
+}
+
+model Department {
+  name    String   @id @unique @db.VarChar(20)
+  order   Int
+  members Member[]
+}
+
+model Blog {
+  id                Int               @unique @default(autoincrement())
+  title             String
+  publicationDate   DateTime
+  publicationStatus PublicationStatus
+  synopsis          String            @db.MediumText
+  content           String            @db.Text
+  order             Int
+  member            Member?           @relation(fields: [authorId], references: [id])
+  authorId          Int?              @unique
+  thumbnailAsset    Asset?            @relation(fields: [thumbnailAssetId], references: [fileName])
+  thumbnailAssetId  String?           @unique
+  featuring         Boolean
+  featureOrder      Int?
+}
+
+model Asset {
+  fileName String   @id @unique
+  data     Bytes    @db.Blob
+  members  Member[] // mandatory boilerplate
+  blogs    Blog[] // mandatory boilerplate
+}
+
+model Social {
+  name  String @id @unique
+  value String
+}
+
+model Project {
+  id                Int               @unique @default(uuid())
+  title             String
+  synopsis          String
+  content           String
+  thumbnail         Asset // fk to asset
+  order             Int
+  publicationStatus PublicationStatus
+  featuring         Boolean
+  featureOrder      Int?
+}
